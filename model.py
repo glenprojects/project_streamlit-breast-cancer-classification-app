@@ -158,25 +158,57 @@ def add_predictions(input_data):
     st.write("Probability of being malicious: ", model.predict_proba(input_array_scaled)[0][1])
     st.write("This app can assist medical professionals in making a diagnosis, but should not be used as a substitute for a professional diagnosis.")
 
+def process_file_upload(uploaded_file):
+    if uploaded_file is not None:
+        data = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
+        st.write("Uploaded Data:")
+        st.write(data.head())
+
+        # Load model and scaler
+        model = pickle.load(open("model/model.pkl", "rb"))
+        scaler = pickle.load(open("model/scaler.pkl", "rb"))
+
+        # Scale the data
+        scaled_data = scaler.transform(data)
+        
+        # Make predictions
+        predictions = model.predict(scaled_data)
+        probabilities = model.predict_proba(scaled_data)
+        
+        # Add predictions and probabilities to the DataFrame
+        data['prediction'] = ['Benign' if p == 0 else 'Malignant' for p in predictions]
+        data['probability_benign'] = probabilities[:, 0]
+        data['probability_malignant'] = probabilities[:, 1]
+
+        # Display updated DataFrame
+        st.write("Predictions:")
+        st.write(data)
+
+        # Save results to a new CSV file
+        data.to_csv('data/predictions_from_file.csv', index=False)
+        st.success("Predictions saved to 'data/predictions_from_file.csv'")
+
 def main():
-   
+    st.title("Breast Cancer Predictor")
+    st.write("Please connect this app to your cytology lab to help diagnose breast cancer from your tissue sample. This app predicts using a machine learning model whether a breast mass is benign or malignant based on the measurements it receives from your cytology lab. You can also update the measurements by hand using the sliders below.")
     
+    # File upload section
+    st.subheader("Upload CSV or Excel File")
+    uploaded_file = st.file_uploader("Upload your input file", type=['csv', 'xlsx'])
+    process_file_upload(uploaded_file)
     
     input_data = add_input_fields()
     
     if input_data:
         with st.container():
-            st.title("Breast Cancer Predictor")
-            st.write("Please connect this app to your cytology lab to help diagnose breast cancer from your tissue sample. This app predicts using a machine learning model whether a breast mass is benign or malignant based on the measurements it receives from your cytology lab. You can also update the measurements by hand using the sliders below.")
-        
-        col1, col2 = st.columns([4, 1])
-        
-        with col1:
-            radar_chart = get_radar_chart(input_data)
-            st.plotly_chart(radar_chart)
-        
-        with col2:
-            add_predictions(input_data)
+            col1, col2 = st.columns([4, 1])
+            
+            with col1:
+                radar_chart = get_radar_chart(input_data)
+                st.plotly_chart(radar_chart)
+            
+            with col2:
+                add_predictions(input_data)
 
 if __name__ == "__main__":
     main()
